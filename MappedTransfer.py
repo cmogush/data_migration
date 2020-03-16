@@ -60,13 +60,16 @@ def mapTransfer(originalDir, targetDir, transferList):
                 mapTransfer(originalEntry, targetEntry, transferList)
         except:
             checkConnection()
+            failedLog = os.path.join(targetDir, 'failed.txt')
+            with open(failedLog, 'a') as file:
+                file.write(str(originalEntry + "\n"))
             continue
 
 def main():
     startTime = datetime.now()
     transferList = []
-    originalDir = r'V:/'
-    transferDir = r"F:\VirtualDrives\share"
+    originalDir = r'C:\Users\Chris\Desktop\Current Projects\data_migration\test\original'
+    transferDir = r"C:\Users\Chris\Desktop\Current Projects\data_migration\test\target"
     mapTransfer(originalDir, transferDir, transferList)
     endTime = datetime.now() - startTime
     print("{} dir entries added to map...time elapsed: {}".format(len(transferList), endTime))
