@@ -1,1 +1,4 @@
 name,original,target,filetype,filesize,status
+1112484_45645289.jpg,C:\Users\Chris\Desktop\Current Projects\data_migration\test\original\1112484_45645289.jpg,C:\Users\Chris\Desktop\Current Projects\data_migration\test\target\1112484_45645289.jpg,.jpg,372309,done
+Summer,C:\Users\Chris\Desktop\Current Projects\data_migration\test\original\Summer,C:\Users\Chris\Desktop\Current Projects\data_migration\test\target\Summer,folder,0,done
+CedarPoint.jpg,C:\Users\Chris\Desktop\Current Projects\data_migration\test\original\Summer\CedarPoint.jpg,C:\Users\Chris\Desktop\Current Projects\data_migration\test\target\Summer\CedarPoint.jpg,.jpg,347486,done

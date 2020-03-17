@@ -1,7 +1,11 @@
+#Script to transfer files from a (virtual) directory to another directory
+
 import os
 import csv
 import time
 import random
+import shutil
+import tempfile
 from urllib.request import urlopen
 from datetime import datetime
 
@@ -12,6 +16,11 @@ def checkConnection():
         for x in range (0,30):
             print(str(30 - x)+" seconds")
             time.sleep(1)
+
+def fileSizeMatches(filesize_final, filesize_original):
+    if filesize_final == filesize_original:
+        return True
+    return False
 
 def internetOn(): #function to see if the internet is on
     listOfUrls = ["http://yahoo.com", "http://msn.com", "http://microsoft.com", "http://apple.com", "http://canon.com",
@@ -24,9 +33,8 @@ def internetOn(): #function to see if the internet is on
     except:
         return False
 
-def createTransferCSV(transferDir, listOfTransfers):
+def createTransferCSV(transferCSV, listOfTransfers):
     keys = ['name', 'original', 'target', 'filetype', 'filesize', 'status']
-    transferCSV = os.path.join(transferDir, "transferLog.csv")
     with open(transferCSV, "w", newline="") as csv_file:
         writer = csv.DictWriter(csv_file, fieldnames=keys)
         writer.writeheader()  # will create first line based on keys
@@ -65,15 +73,95 @@ def mapTransfer(originalDir, targetDir, transferList):
                 file.write(str(originalEntry + "\n"))
             continue
 
+def transferFiles(transferCSV, transferDir, retryFailed):
+    #iterate over rows on csv
+    tempCSVFile = os.path.join(transferDir, "temp.csv")
+    #simulatenously create new (temp) csv that will overwrite current csv
+    with open(transferCSV, newline='') as csv_file, open(tempCSVFile, 'w', newline='') as temp_csv:
+        reader = csv.DictReader(csv_file)
+        finishedLog = csv.DictWriter(temp_csv, fieldnames=['name', 'original', 'target', 'filetype', 'filesize', 'status'])
+        finishedLog.writeheader()  # will create first line based on keys
+        for row in reader:
+            # print("DEBUG {}".format(row['name']))
+            #setup temp row
+            tempRow = {'name' : row['name'], 'original' : row['original'], 'target' : row['target'],
+                'filetype' : row['filetype'], 'filesize' : row['filesize'], 'status' : row['status']}
+            #check the status of the entry
+            #if it's done, marked skip, or failed = False -first- add row to temp csv -then- continue to next entry
+            # print("DEBUG: Status "+row['status'])
+            if not retryFailed and ['status'] == 'failed' or row['status'] == "done":
+                print("DEBUG: {} is {}".format(row['name'], row['status']))
+                finishedLog.writerow(row)  # write row to temp file
+                continue
+
+            #elif see if the file has already been transfered
+            if os.path.exists(row['target']):
+                fileSize = os.path.getsize(row['target'])  # get the filesize for verification purposes
+                if fileSizeMatches(row['filesize'], str(fileSize)): #if it matches then write the row
+                    tempRow['status'] = 'done'
+                    # print("DEBUG: writing to finished log: {}".format(tempRow))
+                    finishedLog.writerow(tempRow)
+                    continue
+            #else try to Transfer
+            try:
+                print("trying {}".format(row['name']))
+                #if it's a folder, create the directory
+                if row['filetype'] == 'folder':
+                    os.makedirs(row['target'])
+                    tempRow['status'] = 'done'
+                    finishedLog.writerow(tempRow)
+                #else attempt to transfer from 'original' to 'target'
+                else:
+                    print("attempting transfer of {}".format(row['name']))
+                    shutil.copyfile(row['original'], row['target'])
+                    #verify that the filesize matches
+                    fileSize = os.path.getsize(row['target'])
+                    if fileSizeMatches(row['filesize'], str(fileSize)):  # if it matches then write the row
+                        tempRow['status'] = 'done'
+                        #add row to temp csv with status as done
+                        finishedLog.writerow(tempRow)
+                    else:
+                        tempRow['status'] = 'failed'
+                        finishedLog.writerow(tempRow)
+                    # print("DEBUG: writing {} as ".format(tempRow['name'], tempRow['status']))
+            except:
+                #except - add row to temp csv with 'failed' as status
+                tempRow['status'] = 'failed'
+                finishedLog.writerow(tempRow)
+                # print("DEBUG: FAILED {}".format(tempRow['name']))
+    #overwrite old csv with new csv
+    shutil.move(tempCSVFile, transferCSV)
+
+def readLog(transferCSV):
+    count = {"total" : 0, "done" : 0, "failed": 0}
+    with open(transferCSV, 'r',) as CSVlog:
+        log = csv.DictReader(CSVlog)
+        for row in log:
+            count['total'] += 1
+            if row['status'] == "done":
+                count["done"] += 1
+            if row['status'] == "failed":
+                count['failed'] +=1
+    return count
+
+
 def main():
     startTime = datetime.now()
     transferList = []
     originalDir = r'C:\Users\Chris\Desktop\Current Projects\data_migration\test\original'
     transferDir = r"C:\Users\Chris\Desktop\Current Projects\data_migration\test\target"
+    transferCSV = os.path.join(transferDir, "transferLog.csv")
     mapTransfer(originalDir, transferDir, transferList)
-    endTime = datetime.now() - startTime
-    print("{} dir entries added to map...time elapsed: {}".format(len(transferList), endTime))
-    createTransferCSV(transferDir, transferList)
+    print("{} dir entries added to map...".format(len(transferList)))
+    createTransferCSV(transferCSV, transferList)
     print("transfer mapped to transferLog.csv")
+    transferFiles(transferCSV, transferDir, retryFailed=False)
+    print("file transfer finished...results written to log")
+    count = readLog(transferCSV)
+    print("------------------------------------------")
+    print("{} files attempted | {} completed successfully | {} failed".format(count['total'], count['done'], count['failed']))
+    endTime = datetime.now() - startTime
+    print("time elapsed: {}".format(endTime))
+
 
 main()
