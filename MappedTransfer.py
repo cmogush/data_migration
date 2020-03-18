@@ -107,29 +107,32 @@ def transferFiles(transferCSV, transferDir, retryFailed):
             try:
                 #if it's a folder, create the directory
                 if row['filetype'] == 'folder':
-                    os.makedirs(row['target'])
+                    os.makedirs(str(row['target']))
                     tempRow['status'] = 'done'
                     finishedLog.writerow(tempRow)
                 #else attempt to transfer from 'original' to 'target'
                 else:
-                    shutil.copyfile(row['original'], row['target'])
+                    print("attempting transfer "+row['name'])
+                    shutil.copyfile(str(row['original']), str(row['target']))
                     #verify that the filesize matches
                     fileSize = os.path.getsize(row['target'])
                     if fileSizeMatches(row['filesize'], str(fileSize)):  # if it matches then write the row
+                        print(row['name']+" succesfully transffered")
                         tempRow['status'] = 'done'
                     else:
                         tempRow['status'] = 'failed'
                         finishedLog.writerow(tempRow)
-                    # print("DEBUG: writing {} as ".format(tempRow['name'], tempRow['status']))
-			except (IOError, os.error) as why:
-                errors.append((srcname, dstname, str(why)))
+            except(IOError, os.error) as why:
+                errors.append((row['original'], str(why)))
                 #except - add row to temp csv with 'failed' as status
                 tempRow['status'] = 'failed'
                 finishedLog.writerow(tempRow)
                 print("{} FAILED".format(tempRow['name']))
     #overwrite old csv with new csv
     shutil.move(tempCSVFile, transferCSV)
-
+    if errors:
+        for err in errors:
+            print(err)
 def readLog(transferCSV):
     count = {"total" : 0, "done" : 0, "failed": 0}
     with open(transferCSV, 'r',) as CSVlog:
@@ -146,8 +149,8 @@ def readLog(transferCSV):
 def main(map, transfer):
     startTime = datetime.now()
     transferList = []
-    originalDir = r'V:/'
-    transferDir = r"F:/VirtualDrives/share"
+    originalDir = r'V:\\'
+    transferDir = r'F:\VirtualDrives\share'
     transferCSV = os.path.join(transferDir, "transferLog.csv")
     if map:
         mapTransfer(originalDir, transferDir, transferList)
