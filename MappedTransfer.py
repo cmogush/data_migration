@@ -75,6 +75,7 @@ def mapTransfer(originalDir, targetDir, transferList):
 
 def transferFiles(transferCSV, transferDir, retryFailed):
     #iterate over rows on csv
+    errors = []
     tempCSVFile = os.path.join(transferDir, "temp.csv")
     #simulatenously create new (temp) csv that will overwrite current csv
     with open(transferCSV, newline='') as csv_file, open(tempCSVFile, 'w', newline='') as temp_csv:
@@ -118,10 +119,10 @@ def transferFiles(transferCSV, transferDir, retryFailed):
                         tempRow['status'] = 'done'
                     else:
                         tempRow['status'] = 'failed'
-                    #add row to temp csv with status as done
-                    finishedLog.writerow(tempRow)
-                    print("{} {}".format(tempRow['name'], tempRow['status']))
-            except:
+                        finishedLog.writerow(tempRow)
+                    # print("DEBUG: writing {} as ".format(tempRow['name'], tempRow['status']))
+			except (IOError, os.error) as why:
+                errors.append((srcname, dstname, str(why)))
                 #except - add row to temp csv with 'failed' as status
                 tempRow['status'] = 'failed'
                 finishedLog.writerow(tempRow)
