@@ -55,6 +55,7 @@ def mapTransfer(originalDir, targetDir, transferList):
     #iterate over all entries in directory
     for entry in os.listdir(originalDir):  # iterate over the original dir
         try:
+            #entry = entry.replace(os.sep, '/')
             originalEntry = os.path.join(originalDir, entry)
             targetEntry = os.path.join(targetDir, entry)
             print("adding to map: " + originalEntry)
@@ -73,6 +74,32 @@ def mapTransfer(originalDir, targetDir, transferList):
                 file.write(str(originalEntry + "\n"))
             continue
 
+def transfer(name, original, target, originalSize, filetype):
+    # elif see if the file has already been transfered
+    if os.path.exists(target):
+        targetFilesize = os.path.getsize(target)  # get the filesize for verification purposes
+        if fileSizeMatches(str(originalSize), str(targetFilesize)):  # if it matches then write the row
+            print("already transferred | {}".format(name))
+            return 'done'
+        elif filetype == "folder":
+            return 'incomplete'
+    # else try to Transfer
+    # if it's a folder, create the directory
+    if filetype == 'folder':
+        os.makedirs(str(target))
+        return 'done'
+    # else attempt to transfer from 'original' to 'target'
+    else:
+        print("attempting transfer | {}".format(name))
+        shutil.copyfile(str(original), str(target))
+        # verify that the filesize matches
+        filesize = os.path.getsize(target)
+        if fileSizeMatches(str(originalSize), str(filesize)):  # if it matches then write the row
+            print("succesfully transffered | {}".format(name))
+            return 'done'
+        else:
+            return 'failed'
+
 def transferFiles(transferCSV, transferDir, retryFailed):
     #iterate over rows on csv
     errors = []
@@ -83,56 +110,33 @@ def transferFiles(transferCSV, transferDir, retryFailed):
         finishedLog = csv.DictWriter(temp_csv, fieldnames=['name', 'original', 'target', 'filetype', 'filesize', 'status'])
         finishedLog.writeheader()  # will create first line based on keys
         for row in reader:
-            # print("DEBUG {}".format(row['name']))
             #setup temp row
             tempRow = {'name' : row['name'], 'original' : row['original'], 'target' : row['target'],
                 'filetype' : row['filetype'], 'filesize' : row['filesize'], 'status' : row['status']}
             #check the status of the entry
             #if it's done, marked skip, or failed = False -first- add row to temp csv -then- continue to next entry
-            # print("DEBUG: Status "+row['status'])
             if not retryFailed and ['status'] == 'failed' or row['status'] == "done":
                 print("skipping: {} | status: {}".format(row['name'], row['status']))
                 finishedLog.writerow(row)  # write row to temp file
                 continue
 
-            #elif see if the file has already been transfered
-            if os.path.exists(row['target']):
-                fileSize = os.path.getsize(row['target'])  # get the filesize for verification purposes
-                if fileSizeMatches(row['filesize'], str(fileSize)): #if it matches then write the row
-                    tempRow['status'] = 'done'
-                    print("{} already transferred".format(tempRow['name']))
-                    finishedLog.writerow(tempRow)
-                    continue
-            #else try to Transfer
+            #transfer the files
             try:
-                #if it's a folder, create the directory
-                if row['filetype'] == 'folder':
-                    os.makedirs(str(row['target']))
-                    tempRow['status'] = 'done'
-                    finishedLog.writerow(tempRow)
-                #else attempt to transfer from 'original' to 'target'
-                else:
-                    print("attempting transfer "+row['name'])
-                    shutil.copyfile(str(row['original']), str(row['target']))
-                    #verify that the filesize matches
-                    fileSize = os.path.getsize(row['target'])
-                    if fileSizeMatches(row['filesize'], str(fileSize)):  # if it matches then write the row
-                        print(row['name']+" succesfully transffered")
-                        tempRow['status'] = 'done'
-                    else:
-                        tempRow['status'] = 'failed'
-                        finishedLog.writerow(tempRow)
+                tempRow['status'] = transfer(str(row['name']), str(row['original']),
+                                         str(row['target']), str(row['filesize']), str(row['filetype']))
+
             except(IOError, os.error) as why:
                 errors.append((row['original'], str(why)))
                 #except - add row to temp csv with 'failed' as status
                 tempRow['status'] = 'failed'
-                finishedLog.writerow(tempRow)
-                print("{} FAILED".format(tempRow['name']))
+                print("FAILED | {}".format(row['name']))
+            finishedLog.writerow(tempRow)
     #overwrite old csv with new csv
     shutil.move(tempCSVFile, transferCSV)
     if errors:
         for err in errors:
             print(err)
+
 def readLog(transferCSV):
     count = {"total" : 0, "done" : 0, "failed": 0}
     with open(transferCSV, 'r',) as CSVlog:
@@ -145,12 +149,11 @@ def readLog(transferCSV):
                 count['failed'] +=1
     return count
 
-
 def main(map, transfer):
     startTime = datetime.now()
     transferList = []
-    originalDir = r'V:\\'
-    transferDir = r'F:\VirtualDrives\share'
+    originalDir = r'V:/'
+    transferDir = r'F:/VirtualDrives/share'
     transferCSV = os.path.join(transferDir, "transferLog.csv")
     if map:
         mapTransfer(originalDir, transferDir, transferList)
@@ -166,5 +169,4 @@ def main(map, transfer):
     endTime = datetime.now() - startTime
     print("time elapsed: {}".format(endTime))
 
-
-main(map=False, transfer=True)
+main(map=True, transfer=True)

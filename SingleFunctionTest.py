@@ -1,5 +1,6 @@
 import os
 import csv
+import shutil
 import time
 import random
 from urllib.request import urlopen
@@ -35,6 +36,11 @@ def createTransferCSV(transferDir, listOfTransfers):
                 writer.writerow(row)
             except:
                 print("could not write: " + str(row))
+
+def fileSizeMatches(filesize_final, filesize_original):
+    if filesize_final == filesize_original:
+        return True
+    return False
 
 def getFileType(entry):
     e = os.path.splitext(entry)
@@ -80,8 +86,48 @@ def transferFiles(transferLog, failed):
     #overwrite old csv with new csv
     return null
 
+def transfer(name, original, target, originalSize, filetype):
+    # elif see if the file has already been transfered
+    original = original.replace(os.sep, '/')
+    target = target.replace(os.sep, '/')
+    if os.path.exists(target):
+        targetFilesize = os.path.getsize(target)  # get the filesize for verification purposes
+        if fileSizeMatches(str(originalSize), str(targetFilesize)):  # if it matches then write the row
+            print("{} already transferred".format(name))
+            return 'done'
+        elif filetype == "folder":
+            return 'incomplete'
+    # else try to Transfer
+    # if it's a folder, create the directory
+    if filetype == 'folder':
+        os.makedirs(str(target))
+        return 'done'
+    # else attempt to transfer from 'original' to 'target'
+    else:
+        print("attempting transfer " + name)
+        shutil.copyfile(str(original), str(target))
+        # verify that the filesize matches
+        filesize = os.path.getsize(target)
+        if fileSizeMatches(str(originalSize), str(filesize)):  # if it matches then write the row
+            print(name + " | succesfully transffered")
+            return 'done'
+        else:
+            return 'failed'
+
 def main():
-    checkConnection()
+    # checkConnection()
+    errors = []
+    try:
+        status = transfer('test', str('V:/00 PDE Course Review Application'),
+                          str('F:\VirtualDrives\share/00 PDE Course Review Application'), '12288', 'folder')
+    except(IOError, os.error) as why:
+        errors.append((row['original'], str(why)))
+        # except - add row to temp csv with 'failed' as status
+        status = 'failed'
+    print(status)
+    if errors:
+        print(errors)
+
     # startTime = datetime.now()
     # transferList = []
     # originalDir = r"C:\Users\cmogush\Desktop\Current Projects\Transfer of Virtual Drives\xfer"
